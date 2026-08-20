@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Cupos de Pases — Sección Discapacidad</title>
+<style>
+  :root{
+    --bg: #EEF1F3;
+    --paper: #FFFFFF;
+    --ink: #1B2733;
+    --ink-soft: #5B6B7A;
+    --blue: #1C5D8C;
+    --blue-dark: #123F5F;
+    --green: #2F7D5C;
+    --green-bg: #E6F2EC;
+    --red: #B23B3B;
+    --red-bg: #F6E8E8;
+    --line: #D7DDE2;
+    --dot-empty: #C7CDD3;
+    --radius: 14px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:640px;margin:0 auto;padding:20px 16px 60px;}
+
+  header.top{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:18px 4px 22px;
+  }
+  header.top .brand{display:flex;align-items:center;gap:10px;}
+  header.top .isa{
+    width:34px;height:34px;border-radius:50%;
+    background:var(--blue);color:#fff;
+    display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:15px;flex-shrink:0;
+  }
+  header.top h1{font-size:16px;margin:0;line-height:1.2;letter-spacing:.2px;}
+  header.top .sub{font-size:12px;color:var(--ink-soft);margin:2px 0 0;}
+  header.top button.logout{
+    border:none;background:none;color:var(--ink-soft);
+    font-size:13px;text-decoration:underline;padding:6px;cursor:pointer;
+  }
+
+  /* --- LOGIN --- */
+  .login-card{
+    background:var(--paper);border-radius:var(--radius);
+    padding:36px 24px;text-align:center;
+    box-shadow:0 1px 3px rgba(27,39,51,.08);
+    margin-top:40px;
+  }
+  .login-card .isa-big{
+    width:56px;height:56px;border-radius:50%;background:var(--blue);
+    color:#fff;display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:24px;margin:0 auto 16px;
+  }
+  .login-card h2{font-size:18px;margin:0 0 4px;}
+  .login-card p{font-size:13px;color:var(--ink-soft);margin:0 0 24px;}
+  .pin-dots{display:flex;justify-content:center;gap:14px;margin-bottom:24px;}
+  .pin-dots span{
+    width:14px;height:14px;border-radius:50%;border:2px solid var(--blue);
+    display:inline-block;transition:background .15s;
+  }
+  .pin-dots span.filled{background:var(--blue);}
+  .keypad{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:10px;
+    max-width:260px;margin:0 auto;
+  }
+  .keypad button{
+    padding:16px 0;font-size:19px;border-radius:12px;border:1px solid var(--line);
+    background:#fff;color:var(--ink);cursor:pointer;
+  }
+  .keypad button:active{background:var(--bg);}
+  .keypad button.wide{grid-column:span 1;color:var(--ink-soft);font-size:14px;}
+  .login-error{color:var(--red);font-size:13px;margin-top:14px;min-height:16px;}
+
+  /* --- STATUS BANNER --- */
+  .banner{
+    font-size:12.5px;padding:9px 12px;border-radius:10px;margin-bottom:16px;
+    display:flex;align-items:center;gap:8px;
+  }
+  .banner.offline{background:#FCEFD9;color:#8A5A00;}
+  .banner.error{background:var(--red-bg);color:var(--red);}
+
+  /* --- MUNICIPIO CARD (motivo ticket perforado) --- */
+  .card{
+    background:var(--paper);border-radius:var(--radius);
+    margin-bottom:14px;position:relative;overflow:hidden;
+    box-shadow:0 1px 3px rgba(27,39,51,.07);
+    display:flex;
+  }
+  .card .stub{
+    width:100px;flex-shrink:0;
+    background:var(--blue);color:#fff;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    position:relative;padding:12px 6px;
+  }
+  .card.full .stub{background:var(--red);}
+  .card .stub .num{font-size:26px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;}
+  .card .stub .num small{font-size:12px;font-weight:500;opacity:.85;}
+  .card .stub .label{font-size:9.5px;text-transform:uppercase;letter-spacing:.6px;opacity:.9;margin-top:4px;text-align:center;}
+  .perf{
+    width:0;border-left:2px dashed rgba(255,255,255,.55);
+    position:absolute;right:0;top:8px;bottom:8px;
+  }
+  .card .body{flex:1;padding:14px 16px;min-width:0;}
+  .card .body h3{margin:0 0 8px;font-size:15.5px;}
+  .dots{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px;}
+  .dots i{
+    width:9px;height:9px;border-radius:50%;
+    background:var(--dot-empty);display:inline-block;
+  }
+  .dots i.on{background:var(--blue);}
+  .card.full .dots i.on{background:var(--red);}
+  .card .meta{font-size:12px;color:var(--ink-soft);display:flex;justify-content:space-between;align-items:center;}
+  .status-pill{
+    font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;
+  }
+  .status-pill.open{background:var(--green-bg);color:var(--green);}
+  .status-pill.closed{background:var(--red-bg);color:var(--red);}
+
+  .warn-strip{
+    font-size:11.5px;font-weight:600;padding:6px 16px;
+    display:flex;align-items:center;gap:6px;
+  }
+  .warn-strip.amber{background:#FCEFD9;color:#8A5A00;}
+  .warn-strip.red{background:var(--red-bg);color:var(--red);}
+
+  .card.admin{cursor:pointer;}
+  .card.admin:active{background:#FAFBFC;}
+
+  /* --- ADMIN CONTROLS --- */
+  .fab{
+    position:fixed;right:20px;bottom:24px;
+    width:54px;height:54px;border-radius:50%;
+    background:var(--blue);color:#fff;border:none;
+    font-size:26px;box-shadow:0 4px 12px rgba(28,93,140,.4);
+    cursor:pointer;
+  }
+  .modal-bg{
+    position:fixed;inset:0;background:rgba(27,39,51,.5);
+    display:flex;align-items:flex-end;justify-content:center;z-index:50;
+  }
+  .modal{
+    background:#fff;border-radius:18px 18px 0 0;padding:22px 20px 28px;
+    width:100%;max-width:640px;
+  }
+  .modal h3{margin:0 0 16px;font-size:16px;}
+  .field{margin-bottom:14px;}
+  .field label{font-size:12px;color:var(--ink-soft);display:block;margin-bottom:5px;}
+  .field input{
+    width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--line);
+    font-size:15px;font-family:inherit;
+  }
+  .modal .actions{display:flex;gap:10px;margin-top:18px;}
+  .modal .actions button{
+    flex:1;padding:13px;border-radius:10px;border:none;font-size:14.5px;font-weight:600;cursor:pointer;
+  }
+  .btn-primary{background:var(--blue);color:#fff;}
+  .btn-danger{background:var(--red-bg);color:var(--red);}
+  .btn-ghost{background:var(--bg);color:var(--ink-soft);}
+
+  .empty{text-align:center;padding:60px 20px;color:var(--ink-soft);font-size:14px;}
+
+  /* --- PUBLIC VIEW --- */
+  .public-hero{text-align:center;padding:30px 10px 10px;}
+  .public-hero .isa-big{
+    width:60px;height:60px;border-radius:50%;background:var(--blue);
+    color:#fff;display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:26px;margin:0 auto 14px;
+  }
+  .public-hero h2{font-size:19px;margin:0 0 2px;}
+  .public-hero p{font-size:12.5px;color:var(--ink-soft);margin:0;}
+</style>
+</head>
+<body>
+<div id="app" class="wrap"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ============ CONFIG ============
+const SUPABASE_URL = "https://unmnfuolvyiqwnbztctj.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVubW5mdW9sdnlpcXduYnp0Y3RqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1MjUwMDgsImV4cCI6MjA5NTEwMTAwOH0.f2Mr5VuuxDLhT64T1A2QQ7kbQ_5Ls77_pELhjXVI5ek";
+const ADMIN_PIN = "1470"; // <-- cambialo por el que quieras usar
+const CACHE_KEY = "cupos_cache_v1";
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const app = document.getElementById('app');
+
+const params = new URLSearchParams(location.search);
+const publicSlug = params.get('m');
+
+let session = { authed: sessionStorage.getItem('cupos_admin') === '1' };
+
+// ============ HELPERS ============
+function saveCache(rows){ localStorage.setItem(CACHE_KEY, JSON.stringify({rows, ts: Date.now()})); }
+function loadCache(){ try{ return JSON.parse(localStorage.getItem(CACHE_KEY)); }catch(e){ return null; } }
+
+function dotsHtml(total, filled){
+  let h = '';
+  for(let i=0;i<total;i++){ h += `<i class="${i<filled?'on':''}"></i>`; }
+  return h;
+}
+
+function fmtDate(iso){
+  if(!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'}) + ' ' + d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+}
+
+const MS_DIA = 1000*60*60*24;
+function diasSinPresentar(iso){
+  if(!iso) return 0;
+  return Math.floor((Date.now() - new Date(iso).getTime()) / MS_DIA);
+}
+function warningHtml(iso){
+  const dias = diasSinPresentar(iso);
+  if(dias >= 60){
+    return `<div class="warn-strip red">⚠ Sin presentaciones hace ${dias} días — riesgo de salir del sistema</div>`;
+  }
+  if(dias >= 30){
+    return `<div class="warn-strip amber">⚠ Sin presentaciones hace ${dias} días</div>`;
+  }
+  return '';
+}
+
+// ============ PUBLIC VIEW ============
+async function renderPublic(slug){
+  app.innerHTML = `<div class="public-hero">
+      <div class="isa-big">♿</div>
+      <h2>Cupo de pases</h2>
+      <p>Consulta de disponibilidad para presentar constancias</p>
+    </div>
+    <div id="public-body" style="margin-top:20px;"></div>`;
+  const body = document.getElementById('public-body');
+  body.innerHTML = `<div class="empty">Cargando...</div>`;
+
+  const { data, error } = await sb.from('cupos_municipios').select('*').eq('slug', slug).single();
+  if(error || !data){
+    body.innerHTML = `<div class="banner error">No se encontró información para este municipio. Verificá el enlace con Sección Discapacidad.</div>`;
+    return;
+  }
+  const full = data.remanente <= 0;
+  body.innerHTML = `
+    <div class="card ${full?'full':''}" style="flex-direction:column;">
+      <div style="display:flex;">
+        <div class="stub">
+          <div class="num">${data.remanente}<small>/${data.cupo_total}</small></div>
+          <div class="label">Remanente</div>
+          <div class="perf"></div>
+        </div>
+        <div class="body">
+          <h3>${data.municipio}</h3>
+          <div class="dots">${dotsHtml(data.cupo_total, data.presentados_constancia)}</div>
+          <div class="meta">
+            <span class="status-pill ${full?'closed':'open'}">${full ? 'Cupo completo' : 'Puede presentar'}</span>
+            <span>Act. ${fmtDate(data.actualizado)}</span>
+          </div>
+        </div>
+      </div>
+      ${warningHtml(data.ultima_presentacion)}
+    </div>
+    <p style="font-size:11.5px;color:var(--ink-soft);text-align:center;margin-top:18px;">
+      ${data.presentados_constancia} de ${data.cupo_total} pases presentados con constancia.
+    </p>`;
+}
+
+// ============ LOGIN ============
+function renderLogin(){
+  let pin = '';
+  app.innerHTML = `
+    <div class="login-card">
+      <div class="isa-big">♿</div>
+      <h2>Panel de cupos</h2>
+      <p>Ingresá tu PIN de acceso</p>
+      <div class="pin-dots" id="pin-dots">
+        ${'<span></span>'.repeat(4)}
+      </div>
+      <div class="keypad" id="keypad"></div>
+      <div class="login-error" id="login-error"></div>
+    </div>`;
+
+  const dotsEl = document.getElementById('pin-dots').children;
+  const errEl = document.getElementById('login-error');
+  const keypad = document.getElementById('keypad');
+  const keys = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
+  keypad.innerHTML = keys.map(k => `<button class="${k===''?'wide':''}" data-k="${k}" ${k===''?'disabled style="visibility:hidden"':''}>${k}</button>`).join('');
+
+  function updateDots(){
+    for(let i=0;i<4;i++){ dotsEl[i].classList.toggle('filled', i < pin.length); }
+  }
+
+  keypad.addEventListener('click', e=>{
+    const btn = e.target.closest('button');
+    if(!btn || btn.disabled) return;
+    const k = btn.dataset.k;
+    errEl.textContent = '';
+    if(k === '⌫'){ pin = pin.slice(0,-1); updateDots(); return; }
+    if(pin.length >= 4) return;
+    pin += k;
+    updateDots();
+    if(pin.length === 4){
+      setTimeout(()=>{
+        if(pin === ADMIN_PIN){
+          sessionStorage.setItem('cupos_admin','1');
+          session.authed = true;
+          renderAdmin();
+        } else {
+          errEl.textContent = 'PIN incorrecto';
+          pin = '';
+          updateDots();
+        }
+      }, 150);
+    }
+  });
+}
+
+// ============ ADMIN ============
+let municipios = [];
+
+async function fetchMunicipios(){
+  try{
+    const { data, error } = await sb.from('cupos_municipios').select('*').order('remanente', {ascending:true});
+    if(error) throw error;
+    municipios = data;
+    saveCache(data);
+    return { ok:true };
+  }catch(e){
+    const cache = loadCache();
+    if(cache){ municipios = cache.rows; return { ok:false, cached:true }; }
+    return { ok:false, cached:false };
+  }
+}
+
+async function renderAdmin(){
+  app.innerHTML = `
+    <header class="top">
+      <div class="brand">
+        <div class="isa">♿</div>
+        <div>
+          <h1>Cupos de Pases</h1>
+          <div class="sub">Sección Discapacidad</div>
+        </div>
+      </div>
+      <button class="logout" id="logout-btn">Salir</button>
+    </header>
+    <div id="banner-slot"></div>
+    <div id="list"></div>
+    <button class="fab" id="add-btn">＋</button>`;
+
+  document.getElementById('logout-btn').onclick = ()=>{
+    sessionStorage.removeItem('cupos_admin');
+    session.authed = false;
+    renderLogin();
+  };
+  document.getElementById('add-btn').onclick = ()=> openAddModal();
+
+  const list = document.getElementById('list');
+  list.innerHTML = `<div class="empty">Cargando...</div>`;
+
+  const res = await fetchMunicipios();
+  const bannerSlot = document.getElementById('banner-slot');
+  if(!res.ok){
+    bannerSlot.innerHTML = res.cached
+      ? `<div class="banner offline">Sin conexión — mostrando últimos datos guardados</div>`
+      : `<div class="banner error">No se pudo conectar y no hay datos guardados en este dispositivo</div>`;
+  }
+
+  renderList();
+}
+
+function renderList(){
+  const list = document.getElementById('list');
+  if(!municipios.length){
+    list.innerHTML = `<div class="empty">Todavía no cargaste ningún municipio.<br>Tocá el botón ＋ para agregar el primero.</div>`;
+    return;
+  }
+  list.innerHTML = municipios.map(m=>{
+    const full = m.remanente <= 0;
+    return `<div class="card admin ${full?'full':''}" data-id="${m.id}" style="flex-direction:column;">
+      <div style="display:flex;cursor:pointer;">
+        <div class="stub">
+          <div class="num">${m.remanente}<small>/${m.cupo_total}</small></div>
+          <div class="label">Remanente</div>
+          <div class="perf"></div>
+        </div>
+        <div class="body">
+          <h3>${m.municipio}</h3>
+          <div class="dots">${dotsHtml(m.cupo_total, m.presentados_constancia)}</div>
+          <div class="meta">
+            <span class="status-pill ${full?'closed':'open'}">${full?'Completo':'Disponible'}</span>
+            <span>Act. ${fmtDate(m.actualizado)}</span>
+          </div>
+        </div>
+      </div>
+      ${warningHtml(m.ultima_presentacion)}
+    </div>`;
+  }).join('');
+
+  list.querySelectorAll('.card').forEach(card=>{
+    card.onclick = ()=> openEditModal(card.dataset.id);
+  });
+}
+
+function openEditModal(id){
+  const m = municipios.find(x=>String(x.id)===String(id));
+  if(!m) return;
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  bg.innerHTML = `<div class="modal">
+      <h3>${m.municipio}</h3>
+      <div class="field">
+        <label>Cupo total</label>
+        <input type="number" id="f-total" value="${m.cupo_total}" min="0">
+      </div>
+      <div class="field">
+        <label>Presentados con constancia</label>
+        <input type="number" id="f-pres" value="${m.presentados_constancia}" min="0">
+      </div>
+      <div class="field">
+        <label>Enlace público para este municipio</label>
+        <input type="text" readonly value="${location.origin}${location.pathname}?m=${m.slug}" onclick="this.select()">
+      </div>
+      <div class="actions">
+        <button class="btn-ghost" id="cancel-btn">Cancelar</button>
+        <button class="btn-primary" id="save-btn">Guardar</button>
+      </div>
+      <div class="actions" style="margin-top:8px;">
+        <button class="btn-danger" id="del-btn" style="width:100%">Eliminar municipio</button>
+      </div>
+    </div>`;
+  document.body.appendChild(bg);
+  bg.onclick = (e)=>{ if(e.target===bg) bg.remove(); };
+  document.getElementById('cancel-btn').onclick = ()=> bg.remove();
+
+  document.getElementById('save-btn').onclick = async ()=>{
+    const cupo_total = parseInt(document.getElementById('f-total').value)||0;
+    const presentados_constancia = parseInt(document.getElementById('f-pres').value)||0;
+    const updateData = {
+      cupo_total, presentados_constancia, actualizado: new Date().toISOString()
+    };
+    // Solo actualiza "última presentación" si realmente sumaron pases presentados
+    if(presentados_constancia > m.presentados_constancia){
+      updateData.ultima_presentacion = new Date().toISOString();
+    }
+    const { error } = await sb.from('cupos_municipios').update(updateData).eq('id', m.id);
+    if(error){ alert('No se pudo guardar. Revisá la conexión.'); return; }
+    bg.remove();
+    renderAdmin();
+  };
+
+  document.getElementById('del-btn').onclick = async ()=>{
+    if(!confirm(`¿Eliminar ${m.municipio}? Esta acción no se puede deshacer.`)) return;
+    const { error } = await sb.from('cupos_municipios').delete().eq('id', m.id);
+    if(error){ alert('No se pudo eliminar. Revisá la conexión.'); return; }
+    bg.remove();
+    renderAdmin();
+  };
+}
+
+function slugify(str){
+  return str.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+}
+
+function openAddModal(){
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  bg.innerHTML = `<div class="modal">
+      <h3>Agregar municipio</h3>
+      <div class="field">
+        <label>Nombre del municipio</label>
+        <input type="text" id="f-nombre" placeholder="Ej. Tafí Viejo">
+      </div>
+      <div class="field">
+        <label>Cupo total</label>
+        <input type="number" id="f-total" value="20" min="0">
+      </div>
+      <div class="actions">
+        <button class="btn-ghost" id="cancel-btn">Cancelar</button>
+        <button class="btn-primary" id="save-btn">Agregar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(bg);
+  bg.onclick = (e)=>{ if(e.target===bg) bg.remove(); };
+  document.getElementById('cancel-btn').onclick = ()=> bg.remove();
+
+  document.getElementById('save-btn').onclick = async ()=>{
+    const nombre = document.getElementById('f-nombre').value.trim();
+    const cupo_total = parseInt(document.getElementById('f-total').value)||20;
+    if(!nombre){ alert('Ingresá el nombre del municipio'); return; }
+    const slug = slugify(nombre);
+    const { error } = await sb.from('cupos_municipios').insert({
+      municipio: nombre, slug, cupo_total, presentados_constancia: 0,
+      actualizado: new Date().toISOString(), ultima_presentacion: new Date().toISOString()
+    });
+    if(error){ alert('No se pudo agregar. ¿El nombre ya existe? ' + error.message); return; }
+    bg.remove();
+    renderAdmin();
+  };
+}
+
+// ============ ROUTER ============
+if(publicSlug){
+  renderPublic(publicSlug);
+} else if(session.authed){
+  renderAdmin();
+} else {
+  renderLogin();
+}
+</script>
+</body>
+</html>
