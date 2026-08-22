@@ -109,6 +109,7 @@
     position:relative;padding:12px 6px;
   }
   .card.full .stub{background:var(--red);}
+  .card.medio .stub{background:#B8860B;}
   .card .stub .num{font-size:26px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;}
   .card .stub .num small{font-size:12px;font-weight:500;opacity:.85;}
   .card .stub .label{font-size:9.5px;text-transform:uppercase;letter-spacing:.6px;opacity:.9;margin-top:4px;text-align:center;}
@@ -125,12 +126,14 @@
   }
   .dots i.on{background:var(--blue);}
   .card.full .dots i.on{background:var(--red);}
+  .card.medio .dots i.on{background:#B8860B;}
   .card .meta{font-size:12px;color:var(--ink-soft);display:flex;justify-content:space-between;align-items:center;}
   .status-pill{
     font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;
   }
   .status-pill.open{background:var(--green-bg);color:var(--green);}
   .status-pill.closed{background:var(--red-bg);color:var(--red);}
+  .status-pill.medio{background:#FCEFD9;color:#8A5A00;}
 
   .warn-strip{
     font-size:11.5px;font-weight:600;padding:6px 16px;
@@ -247,20 +250,29 @@ function diasSinPresentar(iso){
 }
 function warningHtml(iso){
   const dias = diasSinPresentar(iso);
-  if(dias >= 60){
-    return `<div class="warn-strip red">⚠ Sin presentaciones hace ${dias} días — riesgo de salir del sistema</div>`;
-  }
   if(dias >= 30){
+    return `<div class="warn-strip red">⚠ Sin presentaciones hace ${dias} días — dado de baja del sistema</div>`;
+  }
+  if(dias >= 15){
     return `<div class="warn-strip amber">⚠ Sin presentaciones hace ${dias} días</div>`;
   }
   return '';
 }
 
+// Estado visual del ticket según nivel de ocupación
+// verde: menos de la mitad ocupado | amarillo: mitad o más | rojo: completo (cupo lleno)
+function estadoCupo(cupo_total, presentados){
+  const ratio = cupo_total > 0 ? presentados / cupo_total : 0;
+  if(presentados >= cupo_total) return { clase:'full', pill:'closed', texto:'Ocupado' };
+  if(ratio >= 0.5) return { clase:'medio', pill:'medio', texto:'Por completarse' };
+  return { clase:'', pill:'open', texto:'Disponible' };
+}
+
 // ============ TICKET (se muestra luego de validar el código) ============
 function renderTicket(body, data){
-  const full = data.remanente <= 0;
+  const estado = estadoCupo(data.cupo_total, data.presentados_constancia);
   body.innerHTML = `
-    <div class="card ${full?'full':''}" style="flex-direction:column;">
+    <div class="card ${estado.clase}" style="flex-direction:column;">
       <div style="display:flex;">
         <div class="stub">
           <div class="num">${data.remanente}<small>/${data.cupo_total}</small></div>
@@ -271,7 +283,7 @@ function renderTicket(body, data){
           <h3>${data.municipio}</h3>
           <div class="dots">${dotsHtml(data.cupo_total, data.presentados_constancia)}</div>
           <div class="meta">
-            <span class="status-pill ${full?'closed':'open'}">${full ? 'Cupo completo' : 'Puede presentar'}</span>
+            <span class="status-pill ${estado.pill}">${estado.texto}</span>
             <span>Act. ${fmtDate(data.actualizado)}</span>
           </div>
         </div>
@@ -279,7 +291,7 @@ function renderTicket(body, data){
       ${warningHtml(data.ultima_presentacion)}
     </div>
     <p style="font-size:11.5px;color:var(--ink-soft);text-align:center;margin-top:18px;">
-      ${data.presentados_constancia} de ${data.cupo_total} pases presentados con constancia.
+      ${data.presentados_constancia}/${data.cupo_total} constancias — de ${data.pases_asignados || 20} pases totales asignados.
     </p>`;
 }
 
@@ -295,7 +307,7 @@ async function renderLookup(){
   const body = document.getElementById('lookup-body');
   body.innerHTML = `<div class="lookup-card"><div class="empty" style="padding:20px;">Cargando municipios...</div></div>`;
 
-  const { data, error } = await sb.from('cupos_municipios').select('municipio,slug').order('municipio');
+  const { data, error } = await sb.from('cupos_municipios').select('municipio,slug').eq('activo', true).order('municipio');
   if(error || !data){
     body.innerHTML = `<div class="banner error">No se pudo conectar. Probá de nuevo en unos minutos.</div>`;
     return;
@@ -327,7 +339,7 @@ async function renderLookup(){
     if(!slug){ errEl.textContent = 'Elegí tu municipio de la lista.'; return; }
     if(!codigo){ errEl.textContent = 'Ingresá tu código de acceso.'; return; }
 
-    const { data: rec, error: err2 } = await sb.from('cupos_municipios').select('*').eq('slug', slug).eq('codigo', codigo).single();
+    const { data: rec, error: err2 } = await sb.from('cupos_municipios').select('*').eq('slug', slug).eq('codigo', codigo).eq('activo', true).single();
     if(err2 || !rec){
       errEl.textContent = 'Código incorrecto para ese municipio.';
       return;
@@ -425,7 +437,10 @@ async function renderAdmin(){
           <div class="sub">Sección Discapacidad</div>
         </div>
       </div>
-      <button class="logout" id="logout-btn">Salir</button>
+      <div style="display:flex;gap:12px;align-items:center;">
+        <button class="logout" id="historial-btn">Control mensual</button>
+        <button class="logout" id="logout-btn">Salir</button>
+      </div>
     </header>
     <div id="banner-slot"></div>
     <div id="list"></div>
@@ -437,6 +452,7 @@ async function renderAdmin(){
     renderLogin();
   };
   document.getElementById('add-btn').onclick = ()=> openAddModal();
+  document.getElementById('historial-btn').onclick = ()=> renderHistorial();
 
   const list = document.getElementById('list');
   list.innerHTML = `<div class="empty">Cargando...</div>`;
@@ -452,15 +468,70 @@ async function renderAdmin(){
   renderList();
 }
 
+// ============ CONTROL MENSUAL (historial) ============
+async function renderHistorial(){
+  app.innerHTML = `
+    <header class="top">
+      <div class="brand">
+        <div class="isa">♿</div>
+        <div>
+          <h1>Control mensual</h1>
+          <div class="sub">Presentaciones por mes cerrado</div>
+        </div>
+      </div>
+      <button class="logout" id="volver-btn">Volver</button>
+    </header>
+    <div id="hist-body"><div class="empty">Cargando...</div></div>`;
+
+  document.getElementById('volver-btn').onclick = ()=> renderAdmin();
+
+  const body = document.getElementById('hist-body');
+  const { data, error } = await sb.from('cupos_historial').select('*').order('mes', {ascending:false}).order('municipio');
+  if(error){
+    body.innerHTML = `<div class="banner error">No se pudo cargar el historial. Revisá la conexión.</div>`;
+    return;
+  }
+  if(!data.length){
+    body.innerHTML = `<div class="empty">Todavía no se cerró ningún mes.<br>El primer cierre automático va a generar el primer historial acá.</div>`;
+    return;
+  }
+
+  // Agrupar por mes
+  const porMes = {};
+  data.forEach(r=>{
+    const key = r.mes;
+    if(!porMes[key]) porMes[key] = [];
+    porMes[key].push(r);
+  });
+
+  body.innerHTML = Object.keys(porMes).map(mesKey=>{
+    const fecha = new Date(mesKey + 'T00:00:00');
+    const nombreMes = fecha.toLocaleDateString('es-AR',{month:'long', year:'numeric'});
+    const filas = porMes[mesKey].map(r=>`
+      <div class="meta" style="padding:8px 0;border-bottom:1px solid var(--line);">
+        <span>${r.municipio}</span>
+        <span><b>${r.presentados_constancia}</b>/${r.cupo_total} const. — ${r.pases_asignados || 20} pases</span>
+      </div>`).join('');
+    return `<div class="lookup-card" style="margin-bottom:14px;">
+        <h3 style="margin:0 0 10px;text-transform:capitalize;">${nombreMes}</h3>
+        ${filas}
+      </div>`;
+  }).join('');
+}
+
 function renderList(){
   const list = document.getElementById('list');
+  const activos = municipios.filter(m=>m.activo !== false);
+  const inactivos = municipios.filter(m=>m.activo === false);
+
   if(!municipios.length){
     list.innerHTML = `<div class="empty">Todavía no cargaste ningún municipio.<br>Tocá el botón ＋ para agregar el primero.</div>`;
     return;
   }
-  list.innerHTML = municipios.map(m=>{
-    const full = m.remanente <= 0;
-    return `<div class="card admin ${full?'full':''}" data-id="${m.id}" style="flex-direction:column;">
+
+  const cardHtml = (m)=>{
+    const estado = estadoCupo(m.cupo_total, m.presentados_constancia);
+    return `<div class="card admin ${estado.clase}" data-id="${m.id}" style="flex-direction:column;">
       <div style="display:flex;cursor:pointer;">
         <div class="stub">
           <div class="num">${m.remanente}<small>/${m.cupo_total}</small></div>
@@ -471,14 +542,28 @@ function renderList(){
           <h3>${m.municipio}</h3>
           <div class="dots">${dotsHtml(m.cupo_total, m.presentados_constancia)}</div>
           <div class="meta">
-            <span class="status-pill ${full?'closed':'open'}">${full?'Completo':'Disponible'}</span>
+            <span class="status-pill ${estado.pill}">${estado.texto}</span>
             <span>Act. ${fmtDate(m.actualizado)}</span>
+          </div>
+          <div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">
+            ${m.presentados_constancia}/${m.cupo_total} constancias — de ${m.pases_asignados || 20} pases asignados
           </div>
         </div>
       </div>
       ${warningHtml(m.ultima_presentacion)}
     </div>`;
-  }).join('');
+  };
+
+  let html = activos.map(cardHtml).join('');
+
+  if(inactivos.length){
+    html += `<div style="margin:22px 0 10px;font-size:13px;font-weight:600;color:var(--ink-soft);">
+        Dados de baja por inactividad (${inactivos.length})
+      </div>`;
+    html += inactivos.map(cardHtml).join('');
+  }
+
+  list.innerHTML = html;
 
   list.querySelectorAll('.card').forEach(card=>{
     card.onclick = ()=> openEditModal(card.dataset.id);
@@ -490,15 +575,23 @@ function openEditModal(id){
   if(!m) return;
   const bg = document.createElement('div');
   bg.className = 'modal-bg';
+  const inactivoBanner = m.activo === false
+    ? `<div class="banner error" style="margin-bottom:14px;">Esta institución está dada de baja por 30+ días sin presentar. No aparece en la búsqueda pública hasta que la reactives.</div>`
+    : '';
   bg.innerHTML = `<div class="modal">
       <h3>${m.municipio}</h3>
+      ${inactivoBanner}
       <div class="field">
-        <label>Cupo total</label>
+        <label>Cupo de constancias (lo que se completa y define el semáforo)</label>
         <input type="number" id="f-total" value="${m.cupo_total}" min="0">
       </div>
       <div class="field">
-        <label>Presentados con constancia</label>
+        <label>Constancias presentadas</label>
         <input type="number" id="f-pres" value="${m.presentados_constancia}" min="0">
+      </div>
+      <div class="field">
+        <label>Pases totales asignados (dato informativo)</label>
+        <input type="number" id="f-pases" value="${m.pases_asignados || 20}" min="0">
       </div>
       <div class="field">
         <label>Código de acceso del municipio (4 dígitos)</label>
@@ -512,6 +605,10 @@ function openEditModal(id){
         <button class="btn-ghost" id="cancel-btn">Cancelar</button>
         <button class="btn-primary" id="save-btn">Guardar</button>
       </div>
+      ${m.activo === false ? `
+      <div class="actions" style="margin-top:8px;">
+        <button class="btn-primary" id="reactivar-btn" style="width:100%;background:var(--green);">Reactivar en el sistema</button>
+      </div>` : ''}
       <div class="actions" style="margin-top:8px;">
         <button class="btn-danger" id="del-btn" style="width:100%">Eliminar municipio</button>
       </div>
@@ -520,12 +617,24 @@ function openEditModal(id){
   bg.onclick = (e)=>{ if(e.target===bg) bg.remove(); };
   document.getElementById('cancel-btn').onclick = ()=> bg.remove();
 
+  if(m.activo === false){
+    document.getElementById('reactivar-btn').onclick = async ()=>{
+      const { error } = await sb.from('cupos_municipios').update({
+        activo: true, ultima_presentacion: new Date().toISOString(), actualizado: new Date().toISOString()
+      }).eq('id', m.id);
+      if(error){ alert('No se pudo reactivar. Revisá la conexión.'); return; }
+      bg.remove();
+      renderAdmin();
+    };
+  }
+
   document.getElementById('save-btn').onclick = async ()=>{
     const cupo_total = parseInt(document.getElementById('f-total').value)||0;
     const presentados_constancia = parseInt(document.getElementById('f-pres').value)||0;
+    const pases_asignados = parseInt(document.getElementById('f-pases').value)||20;
     const codigo = document.getElementById('f-codigo').value.trim();
     const updateData = {
-      cupo_total, presentados_constancia, codigo, actualizado: new Date().toISOString()
+      cupo_total, presentados_constancia, pases_asignados, codigo, actualizado: new Date().toISOString()
     };
     // Solo actualiza "última presentación" si realmente sumaron pases presentados
     if(presentados_constancia > m.presentados_constancia){
@@ -562,8 +671,12 @@ function openAddModal(){
         <input type="text" id="f-nombre" placeholder="Ej. Tafí Viejo">
       </div>
       <div class="field">
-        <label>Cupo total</label>
-        <input type="number" id="f-total" value="20" min="0">
+        <label>Cupo de constancias</label>
+        <input type="number" id="f-total" value="10" min="0">
+      </div>
+      <div class="field">
+        <label>Pases totales asignados</label>
+        <input type="number" id="f-pases" value="20" min="0">
       </div>
       <div class="actions">
         <button class="btn-ghost" id="cancel-btn">Cancelar</button>
@@ -576,12 +689,13 @@ function openAddModal(){
 
   document.getElementById('save-btn').onclick = async ()=>{
     const nombre = document.getElementById('f-nombre').value.trim();
-    const cupo_total = parseInt(document.getElementById('f-total').value)||20;
+    const cupo_total = parseInt(document.getElementById('f-total').value)||10;
+    const pases_asignados = parseInt(document.getElementById('f-pases').value)||20;
     if(!nombre){ alert('Ingresá el nombre del municipio'); return; }
     const slug = slugify(nombre);
     const codigo = String(Math.floor(1000 + Math.random()*9000));
     const { error } = await sb.from('cupos_municipios').insert({
-      municipio: nombre, slug, cupo_total, presentados_constancia: 0, codigo,
+      municipio: nombre, slug, cupo_total, presentados_constancia: 0, pases_asignados, codigo,
       actualizado: new Date().toISOString(), ultima_presentacion: new Date().toISOString()
     });
     if(error){ alert('No se pudo agregar. ¿El nombre ya existe? ' + error.message); return; }
